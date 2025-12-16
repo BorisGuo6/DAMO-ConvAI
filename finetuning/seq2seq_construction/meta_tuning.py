@@ -6,7 +6,8 @@ import numpy as np
 from datasets import DatasetDict
 from random import shuffle
 from torch.utils.data import Dataset, ConcatDataset
-from torch.utils.data.dataset import T_co
+from typing import TypeVar
+T_co = TypeVar("T_co", covariant=True)
 
 from utils.configue import Configure
 

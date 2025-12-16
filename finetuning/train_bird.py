@@ -101,7 +101,8 @@ def main() -> None:
             print('task_args.bert.location:', task_args.bert.location)
             task_raw_datasets_split: datasets.DatasetDict = datasets.load_dataset(
                 path=task_args.dataset.loader_path,
-                cache_dir=task_args.dataset.data_store_path)
+                cache_dir=task_args.dataset.data_store_path,
+                trust_remote_code=True)
             task_seq2seq_dataset_split: tuple = utils.tool.get_constructor(task_args.seq2seq.constructor)(task_args).\
                 to_seq2seq(task_raw_datasets_split, cache_root)
 

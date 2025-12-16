@@ -13,8 +13,18 @@ from packaging import version
 from torch import nn
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data.sampler import SequentialSampler
-from transformers.deepspeed import is_deepspeed_zero3_enabled
-from transformers.file_utils import is_datasets_available
+try:
+    from transformers.integrations import is_deepspeed_zero3_enabled
+except ImportError:
+    try:
+        from transformers.deepspeed import is_deepspeed_zero3_enabled
+    except ImportError:
+        def is_deepspeed_zero3_enabled():
+            return False
+try:
+    from transformers.file_utils import is_datasets_available
+except ImportError:
+    from transformers.utils import is_datasets_available
 from transformers.trainer_pt_utils import (
     DistributedLengthGroupedSampler,
     DistributedSamplerWithLoop,

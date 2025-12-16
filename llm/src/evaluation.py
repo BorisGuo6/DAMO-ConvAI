@@ -100,10 +100,10 @@ def compute_acc_by_diff(exec_results,diff_json_path):
         if content['difficulty'] == 'challenging':
             challenging_results.append(exec_results[i])
 
-    simple_acc = sum([res['res'] for res in simple_results])/len(simple_results)
-    moderate_acc = sum([res['res'] for res in moderate_results])/len(moderate_results)
-    challenging_acc = sum([res['res'] for res in challenging_results])/len(challenging_results)
-    all_acc = sum(results)/num_queries
+    simple_acc = sum([res['res'] for res in simple_results])/len(simple_results) if simple_results else 0
+    moderate_acc = sum([res['res'] for res in moderate_results])/len(moderate_results) if moderate_results else 0
+    challenging_acc = sum([res['res'] for res in challenging_results])/len(challenging_results) if challenging_results else 0
+    all_acc = sum(results)/num_queries if num_queries else 0
     count_lists = [len(simple_results), len(moderate_results), len(challenging_results), num_queries]
     return simple_acc * 100, moderate_acc * 100, challenging_acc * 100, all_acc * 100, count_lists
 

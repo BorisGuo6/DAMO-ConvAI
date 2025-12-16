@@ -7,7 +7,8 @@ from typing import List, Dict
 
 from datasets.dataset_dict import DatasetDict
 from torch.utils.data import Dataset
-from torch.utils.data.dataset import T_co
+from typing import TypeVar
+T_co = TypeVar('T_co', covariant=True)
 
 from third_party.miscs.bridge_content_encoder import get_database_matches
 

@@ -10,14 +10,12 @@ import sqlite3
 from typing import Dict, List, Tuple
 
 import backoff
-import openai
+from openai import OpenAI
 import pandas as pd
 import sqlparse
 from tqdm import tqdm
+
 '''openai configure'''
-
-openai.debug=True
-
 
 def new_directory(path):  
     if not os.path.exists(path):  
@@ -146,23 +144,43 @@ def generate_combined_prompts_one(db_path, question, knowledge=None):
 
     return combined_prompts
 
-def quota_giveup(e):
-    return isinstance(e, openai.error.RateLimitError) and "quota" in str(e)
-
+# Updated for new OpenAI API
 @backoff.on_exception(
     backoff.constant,
-    openai.error.OpenAIError,
-    giveup=quota_giveup,
-    raise_on_giveup=True,
+    Exception,
+    max_tries=5,
     interval=20
 )
-def connect_gpt(engine, prompt, max_tokens, temperature, stop):
-    # print(prompt)
+def connect_gpt(client, engine, prompt, max_tokens, temperature, stop):
     try:
-        result = openai.Completion.create(engine=engine, prompt=prompt, max_tokens=max_tokens, temperature=temperature, stop=stop)
+        # Use chat completions API for gpt-3.5-turbo and gpt-4
+        if 'gpt-3.5' in engine or 'gpt-4' in engine:
+            response = client.chat.completions.create(
+                model=engine,
+                messages=[
+                    {"role": "system", "content": "You are an expert SQL assistant. Generate only the SQL query without explanations."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=stop
+            )
+            result = response.choices[0].message.content
+        else:
+            # For older models (if any still supported)
+            response = client.completions.create(
+                model=engine,
+                prompt=prompt,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=stop
+            )
+            result = response.choices[0].text
+        return result
     except Exception as e:
-        result = 'error:{}'.format(e)
-    return result
+        print(f"Error: {e}")
+        return f'error:{e}'
+
 def collect_response_from_gpt(db_path_list, question_list, api_key, engine, knowledge_list=None):
     '''
     :param db_path: str
@@ -171,7 +189,8 @@ def collect_response_from_gpt(db_path_list, question_list, api_key, engine, know
     '''
     responses_dict = {}
     response_list = []
-    openai.api_key = api_key
+    client = OpenAI(api_key=api_key)
+    
     for i, question in tqdm(enumerate(question_list)):
         print('--------------------- processing {}th question ---------------------'.format(i))
         print('the question is: {}'.format(question))
@@ -181,17 +200,25 @@ def collect_response_from_gpt(db_path_list, question_list, api_key, engine, know
         else:
             cur_prompt = generate_combined_prompts_one(db_path=db_path_list[i], question=question)
         
-        plain_result = connect_gpt(engine=engine, prompt=cur_prompt, max_tokens=256, temperature=0, stop=['--', '\n\n', ';', '#'])
-        # pdb.set_trace()
-        # plain_result = connect_gpt(engine=engine, prompt=cur_prompt, max_tokens=256, temperature=0, stop=['</s>'])
-        # determine wheter the sql is wrong
+        plain_result = connect_gpt(client=client, engine=engine, prompt=cur_prompt, max_tokens=256, temperature=0, stop=['--', '\n\n', ';', '#'])
         
-        if type(plain_result) == str:
+        if plain_result.startswith('error:'):
             sql = plain_result
         else:
-            sql = 'SELECT' + plain_result['choices'][0]['text']
+            # Clean the result - remove markdown code blocks if present
+            sql = plain_result.strip()
+            if sql.startswith('```sql'):
+                sql = sql[6:]
+            if sql.startswith('```'):
+                sql = sql[3:]
+            if sql.endswith('```'):
+                sql = sql[:-3]
+            sql = sql.strip()
+            
+            # Ensure it starts with SELECT
+            if not sql.upper().startswith('SELECT'):
+                sql = 'SELECT ' + sql
         
-        # responses_dict[i] = sql
         db_id = db_path_list[i].split('/')[-1].split('.sqlite')[0]
         sql = sql + '\t----- bird -----\t' + db_id # to avoid unpredicted \t appearing in codex results
         response_list.append(sql)
@@ -245,15 +272,18 @@ if __name__ == '__main__':
     args_parser.add_argument('--db_root_path', type=str, default='')
     # args_parser.add_argument('--db_name', type=str, required=True)
     args_parser.add_argument('--api_key', type=str, required=True)
-    args_parser.add_argument('--engine', type=str, required=True, default='code-davinci-002')
+    args_parser.add_argument('--engine', type=str, required=True, default='gpt-3.5-turbo')
     args_parser.add_argument('--data_output_path', type=str)
     args_parser.add_argument('--chain_of_thought', type=str)
+    args_parser.add_argument('--num_samples', type=int, default=0, help='Number of samples to process (0 for all)')
     args = args_parser.parse_args()
     
     eval_data = json.load(open(args.eval_path, 'r'))
-    # '''for debug'''
-    # eval_data = eval_data[:3]
-    # '''for debug'''
+    
+    # Limit samples if specified
+    if args.num_samples > 0:
+        eval_data = eval_data[:args.num_samples]
+        print(f'Processing only first {args.num_samples} samples for testing')
     
     question_list, db_path_list, knowledge_list = decouple_question_schema(datasets=eval_data, db_root_path=args.db_root_path)
     assert len(question_list) == len(db_path_list) == len(knowledge_list)

@@ -7,6 +7,8 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 
 class Model(PushToHubFriendlyModel):
+    main_input_name = "input_ids"  # Required for new transformers versions
+    
     def __init__(self, args):
         super().__init__()
         self.args = args

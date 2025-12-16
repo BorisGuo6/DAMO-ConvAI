@@ -109,6 +109,8 @@ def sort_results(list_of_dicts):
 
 def compute_ves(exec_results):
     num_queries = len(exec_results)
+    if num_queries == 0:
+        return 0
     total_ratio = 0
     count = 0
 
