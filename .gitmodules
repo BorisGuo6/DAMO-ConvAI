@@ -1,0 +1,6 @@
+[submodule "finetuning/third_party/spider"]
+	path = finetuning/third_party/spider
+	url = https://github.com/taoyds/spider.git
+[submodule "finetuning/third_party/picard"]
+	path = finetuning/third_party/picard
+	url = https://github.com/ElementAI/picard.git
