@@ -132,3 +132,5 @@ dmypy.json
 .idea
 .DS_Store
 /data/dev_databases
+finetuning/third_party/spider/
+finetuning/third_party/picard/
